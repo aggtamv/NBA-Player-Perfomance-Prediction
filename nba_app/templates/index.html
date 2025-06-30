@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}NBA Home Page{% endblock %}
+{% block content %}
+<div class="row min-vh-100">
+    <!-- Left Column -->
+    <div class="col-md-4 col-12 daily-stats-container">
+        <div class="bubble" id="games-bubble">
+            <div class="container">
+                <div class="game-container d-flex flex-wrap">
+                    {% for i in range(0, nba_games|length, 2) %}
+                        {% set game1 = nba_games[i] %}
+                        {% set game2 = nba_games[i + 1] if i + 1 < nba_games|length else None %}
+                        <div class="game-card-wrapper p-2">
+                            <div class="game-card p-3 shadow-sm rounded">
+                                <div class="game-stats row">
+                                    {% if game2 %}
+                                    {% set winner, loser = (game1, game2) if game1.score >= game2.score else (game2, game1) %}
+                                    
+                                    <div class="team-entry d-flex align-items-center mb-2">
+                                        <img src="{{ url_for('static', filename='img/' ~ winner.team.replace(' ', '_') ~ '.svg') }}"
+                                        alt="{{ winner.team }} logo"
+                                        class="team-logo me-2">
+                                        <div class="team-info">
+                                            <strong>{{ winner.team }}</strong>:
+                                            <span style="color: green;">{{ winner.score }}</span>
+                                        </div>
+                                    </div>
+                
+                                    <div class="team-entry d-flex align-items-center">
+                                        <img src="{{ url_for('static', filename='img/' ~ loser.team.replace(' ', '_') ~ '.svg') }}"
+                                        alt="{{ loser.team }} logo"
+                                        class="team-logo me-2">
+                                        <div class="team-info">
+                                            <strong>{{ loser.team }}</strong>:
+                                            <span style="color: red;">{{ loser.score }}</span>
+                                        </div>
+                                    </div>
+                                    {% else %}
+                                        <div class="team-entry d-flex align-items-center">
+                                            <img src="{{ game1.team_logo }}" alt="{{ game1.team }} logo" class="team-logo me-2">
+                                            <div class="team-info">
+                                                <strong>{{ game1.team }}</strong>: {{ game1.score }}
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                {% set boxscores = nba_boxscores | selectattr("team", "in", [winner.team, loser.team]) | list %}
+                                {% if boxscores %}
+                                <div class="boxscore row">
+                                <table class="table">
+                                <thead>
+                                <tr>
+                                    <th scope="col">Q1</th>
+                                    <th scope="col">Q2</th>
+                                    <th scope="col">Q3</th>
+                                    <th scope="col">Q4</th>
+                                    <th scope="col">TOT</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {% for stat in boxscores %}
+                                <tr>
+                                    <td>{{ stat.Q1 }}</td>
+                                    <td>{{ stat.Q2 }}</td>
+                                    <td>{{ stat.Q3 }}</td>
+                                    <td>{{ stat.Q4 }}</td>
+                                    <td>{{ stat.Q1 + stat.Q2 + stat.Q3 + stat.Q4 }}</td>
+                                </tr>
+                                {% endfor %}
+                                </tbody>
+                                </table>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>  
+    </div>
+
+    
+
+
+    <!-- Right Column -->
+    <div class="col-md-8 col-12">
+        <div class="player-stats-container mt-4 me-4">
+            <div class="player-searchbox mt-2">
+                <input type="text" id="searchBox" class="form-control mb-3" placeholder="Search by player name...">
+                <div class="table-stats-container">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-bordered" id="statsTable">
+                            <thead class="table-dark">
+                                <tr>
+                                    {% for key in total_stats[0].keys() %}
+                                        <th>{{ key }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in total_stats %}
+                                    <tr>
+                                        {% for value in row.values() %}
+                                            <td>{{ value | safe }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table> 
+                    </div>
+                </div>
+            </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+{% endblock %}
+{% block script_block %}
+<script>
+    const searchBox = document.getElementById("searchBox");
+    const table = document.getElementById("statsTable").getElementsByTagName("tbody")[0];
+    const wrapper = table.parentNode;
+    console.log("wrapper", wrapper);
+    const maxRows = 10;
+    let height = 0;
+
+    searchBox.addEventListener("keyup", function() {
+        const query = searchBox.value.toLowerCase();
+        
+        const rows = table.getElementsByTagName("tr");
+
+        for (let row of rows) {
+            const playerName = row.cells[1].textContent.toLowerCase(); // assumes Player is the 1st column
+            
+            row.style.display = playerName.includes(query) ? "" : "none";
+        }
+    });
+
+    for (let i = 0; i < Math.min(maxRows, table.rows.length); i++) {
+        height += table.rows[i].clientHeight;
+        console.log("wrapper", height);
+        }
+
+        wrapper.style.maxHeight = height + "px";
+        wrapper.style.overflowY = "auto"; // make sure it scrolls
+</script>
+{% endblock %}
+
