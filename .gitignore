@@ -1,2 +1,6 @@
 instance/nba_oracleDB.db
 flask-ui*.log
+data/archive/NBA_Database.sql
+*.sqlite
+*.sqlite3
+*.db
