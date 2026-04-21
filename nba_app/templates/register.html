@@ -3,30 +3,33 @@
 {% block title %}Register - NBA Oracle{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-center align-items-center" style="min-height: 80vh;">
-    <div class="card shadow p-4" style="background-color: #ECEFF1; width: 100%; max-width: 400px;">
-        <h3 class="text-center mb-4" style="color: #01579B;">Set Your Password</h3>
+<section class="page-shell auth-page d-flex justify-content-center align-items-center">
+    <div class="auth-card">
+        <div class="text-center mb-4">
+            <p class="eyebrow">Create account</p>
+            <h1 class="page-title">Set your password</h1>
+        </div>
 
         <form method="POST" action="{{ url_for('auth.register') }}">
             {{ form.hidden_tag() }}
 
             <div class="mb-3">
-                {{ form.email.label(class="form-label", style="color: #01579B;") }}
+                {{ form.email.label(class="form-label") }}
                 {{ form.email(class="form-control", readonly=true) }}
             </div>
 
             <div class="mb-3">
-                {{ form.password.label(class="form-label", style="color: #01579B;") }}
+                {{ form.password.label(class="form-label") }}
                 {{ form.password(class="form-control") }}
             </div>
 
             <div class="mb-3">
-                {{ form.confirm_password.label(class="form-label", style="color: #01579B;") }}
+                {{ form.confirm_password.label(class="form-label") }}
                 {{ form.confirm_password(class="form-control") }}
             </div>
 
-            {{ form.submit(class="btn w-100", style="background-color: #01579B; color: white;") }}
+            {{ form.submit(class="btn btn-primary w-100") }}
         </form>
     </div>
-</div>
+</section>
 {% endblock %}

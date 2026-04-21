@@ -3,49 +3,48 @@
 {% block title %}Login - NBA Oracle{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-center align-items-center" style="min-height: 80vh;">
-    <div class="card shadow p-4" style="background-color: #ECEFF1; width: 100%; max-width: 400px;">
-        <h3 class="text-center mb-4" style="color: #01579B;">Login</h3>
+<section class="page-shell auth-page d-flex justify-content-center align-items-center">
+    <div class="auth-card">
+        <div class="text-center mb-4">
+            <p class="eyebrow">Welcome back</p>
+            <h1 class="page-title">Login</h1>
+        </div>
 
-        <!-- Traditional Login Form -->
         <form method="POST" action="{{ url_for('auth.login') }}">
             {{ form.hidden_tag() }}
             <div class="mb-3">
-                {{ form.email.label(class="form-label", style="color: #01579B;") }}
+                {{ form.email.label(class="form-label") }}
                 {{ form.email(class="form-control", id="email") }}
             </div>
             <div class="mb-3">
-                {{ form.password.label(class="form-label", style="color: #01579B;") }}
+                {{ form.password.label(class="form-label") }}
                 {{ form.password(class="form-control", id="password") }}
             </div>
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <div class="form-check">
                     {{ form.remember(class="form-check-input", id="remember") }}
-                    {{ form.remember.label(class="form-check-label", for="remember", style="color: #01579B;") }}
+                    {{ form.remember.label(class="form-check-label", for="remember") }}
                 </div>
-                <a href="/forgot-password" style="color: #01579B;">Forgot Password?</a>
+                <a href="/forgot-password">Forgot Password?</a>
             </div>
-            {{ form.submit(class="btn w-100 mb-3", style="background-color: #01579B; color: white;") }}
+            {{ form.submit(class="btn btn-primary w-100 mb-3") }}
         </form>
 
-        <!-- Divider -->
         <div class="text-center my-2 text-muted">or</div>
 
-        <!-- Google Login Button -->
         <div class="text-center mb-3">
             <a href="{{ url_for('google.login') }}" class="btn btn-outline-dark w-100">
-                <img src="https://developers.google.com/identity/images/g-logo.png" width="20" class="me-2">
+                <img src="https://developers.google.com/identity/images/g-logo.png" width="20" class="me-2" alt="">
                 Login with Google
             </a>
         </div>
 
-        <!-- Register Link -->
         <div class="text-center mt-2">
-            <p style="color: #01579B;">Don't have an account? 
-                <a href="/register" style="color: #01579B; font-weight: bold;">Register</a>
+            <p class="table-meta">Don't have an account?
+                <a href="/register">Register</a>
             </p>
         </div>
     </div>
-</div>
+</section>
 {% endblock %}
 

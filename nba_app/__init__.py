@@ -109,7 +109,6 @@ def create_dash_app(flask_app):
 
 
 def create_database(app):
-    if not path.exists(os.path.join('nba_oracle', Config.DB_NAME)):
-        with app.app_context():
-            db.create_all()
-        print('Created Database!')
+    os.makedirs(Config.instance_dir, exist_ok=True)
+    with app.app_context():
+        db.create_all()

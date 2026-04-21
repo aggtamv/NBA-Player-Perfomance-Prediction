@@ -1,17 +1,152 @@
 {% extends "base.html" %}
 
-{% block title %}Shooting Stats{% endblock %}
+{% block title %}Stats - NBA Oracle{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <h2 class="mb-4 text-center">NBA Shooting Averages</h2>
-
-    <div style="width:100%; height:1400px;">
-        <iframe src="/stats/" style="border:none; width:100%; height:100%;"></iframe>
+<section class="page-shell stats-page">
+    <div class="dashboard-header">
+        <div>
+            <p class="eyebrow">Shooting trends</p>
+            <h1 class="page-title">NBA shooting analytics</h1>
+            <p class="page-subtitle">Track shot profile, finishing, and league-adjusted efficiency over time.</p>
+        </div>
+        <div class="dashboard-actions">
+            <span class="game-status">{{ stats_metrics.year_range or 'No data' }}</span>
+        </div>
     </div>
 
-</div>
+    <div class="metric-grid">
+        <div class="metric-card">
+            <div class="metric-label">Years Covered</div>
+            <div class="metric-value">{{ stats_metrics.year_range or '-' }}</div>
+            <div class="metric-note">Shooting averages dataset</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Latest TS%</div>
+            <div class="metric-value">{{ '%.3f'|format(stats_metrics.latest_ts) if stats_metrics.latest_ts is not none else '-' }}</div>
+            <div class="metric-note">{{ stats_metrics.latest_year or '-' }} league average</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Latest eFG%</div>
+            <div class="metric-value">{{ '%.3f'|format(stats_metrics.latest_efg) if stats_metrics.latest_efg is not none else '-' }}</div>
+            <div class="metric-note">{{ stats_metrics.latest_year or '-' }} effective rate</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">3PAr Change</div>
+            <div class="metric-value">{{ '%+.3f'|format(stats_metrics.three_point_rate_change) if stats_metrics.three_point_rate_change is not none else '-' }}</div>
+            <div class="metric-note">Since first tracked season</div>
+        </div>
+    </div>
+
+    <div class="stats-chart-grid">
+        <section class="panel">
+            <div class="panel-header">
+                <div>
+                    <h2 class="panel-title">Raw Shooting Profile</h2>
+                    <p class="panel-subtitle">Shot distance mix and make rates</p>
+                </div>
+            </div>
+            <div class="chart-panel-body">
+                <div id="rawShootingChart" class="plotly-chart"></div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="panel-header">
+                <div>
+                    <h2 class="panel-title">Adjusted Efficiency</h2>
+                    <p class="panel-subtitle">League-adjusted shooting and shot mix</p>
+                </div>
+            </div>
+            <div class="chart-panel-body">
+                <div id="adjustedShootingChart" class="plotly-chart"></div>
+            </div>
+        </section>
+    </div>
+
+    <section class="panel mt-3">
+        <div class="panel-header">
+            <div>
+                <h2 class="panel-title">Season Tables</h2>
+                <p class="panel-subtitle">Latest 10 seasons for quick inspection</p>
+            </div>
+        </div>
+
+        <div class="stats-tabs">
+            <ul class="nav nav-tabs px-3 pt-3" id="statsTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="raw-table-tab" data-bs-toggle="tab" data-bs-target="#raw-table-panel" type="button" role="tab" aria-controls="raw-table-panel" aria-selected="true">Raw Shooting</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="adjusted-table-tab" data-bs-toggle="tab" data-bs-target="#adjusted-table-panel" type="button" role="tab" aria-controls="adjusted-table-panel" aria-selected="false">Adjusted Shooting</button>
+                </li>
+            </ul>
+
+            <div class="tab-content">
+                <div class="tab-pane fade show active" id="raw-table-panel" role="tabpanel" aria-labelledby="raw-table-tab">
+                    <div class="table-responsive stats-table-wrap stats-table-compact">
+                        <table class="table table-striped stats-table">
+                            <thead>
+                                <tr>
+                                    {% for col in shooting_columns %}
+                                        <th>{{ col }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in shooting_table %}
+                                    <tr>
+                                        {% for col in shooting_columns %}
+                                            <td>{{ row[col] }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="adjusted-table-panel" role="tabpanel" aria-labelledby="adjusted-table-tab">
+                    <div class="table-responsive stats-table-wrap stats-table-compact">
+                        <table class="table table-striped stats-table">
+                            <thead>
+                                <tr>
+                                    {% for col in adj_shooting_columns %}
+                                        <th>{{ col }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in adj_shooting_table %}
+                                    <tr>
+                                        {% for col in adj_shooting_columns %}
+                                            <td>{{ row[col] }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</section>
 {% endblock %}
 
 {% block script_block %}
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script>
+    const rawShootingFigure = {{ shooting_avg_json | safe }};
+    const adjustedShootingFigure = {{ adj_shooting_avg_json | safe }};
+    const plotConfig = { responsive: true, displayModeBar: false };
+
+    if (rawShootingFigure && rawShootingFigure.data) {
+        Plotly.newPlot("rawShootingChart", rawShootingFigure.data, rawShootingFigure.layout, plotConfig);
+    }
+
+    if (adjustedShootingFigure && adjustedShootingFigure.data) {
+        Plotly.newPlot("adjustedShootingChart", adjustedShootingFigure.data, adjustedShootingFigure.layout, plotConfig);
+    }
+</script>
 {% endblock %}

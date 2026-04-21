@@ -1,150 +1,244 @@
 {% extends "base.html" %}
-{% block title %}NBA Home Page{% endblock %}
+{% block title %}NBA Dashboard{% endblock %}
+
 {% block content %}
-<div class="row min-vh-100">
-    <!-- Left Column -->
-    <div class="col-md-4 col-12 daily-stats-container">
-        <div class="bubble" id="games-bubble">
-            <div class="container">
-                <div class="game-container d-flex flex-wrap">
-                    {% for i in range(0, nba_games|length, 2) %}
-                        {% set game1 = nba_games[i] %}
-                        {% set game2 = nba_games[i + 1] if i + 1 < nba_games|length else None %}
-                        <div class="game-card-wrapper p-2">
-                            <div class="game-card p-3 shadow-sm rounded">
-                                <div class="game-stats row">
-                                    {% if game2 %}
-                                    {% set winner, loser = (game1, game2) if game1.score >= game2.score else (game2, game1) %}
-                                    
-                                    <div class="team-entry d-flex align-items-center mb-2">
-                                        <img src="{{ url_for('static', filename='img/' ~ winner.team.replace(' ', '_') ~ '.svg') }}"
-                                        alt="{{ winner.team }} logo"
-                                        class="team-logo me-2">
-                                        <div class="team-info">
-                                            <strong>{{ winner.team }}</strong>:
-                                            <span style="color: green;">{{ winner.score }}</span>
-                                        </div>
-                                    </div>
-                
-                                    <div class="team-entry d-flex align-items-center">
-                                        <img src="{{ url_for('static', filename='img/' ~ loser.team.replace(' ', '_') ~ '.svg') }}"
-                                        alt="{{ loser.team }} logo"
-                                        class="team-logo me-2">
-                                        <div class="team-info">
-                                            <strong>{{ loser.team }}</strong>:
-                                            <span style="color: red;">{{ loser.score }}</span>
-                                        </div>
-                                    </div>
-                                    {% else %}
-                                        <div class="team-entry d-flex align-items-center">
-                                            <img src="{{ game1.team_logo }}" alt="{{ game1.team }} logo" class="team-logo me-2">
-                                            <div class="team-info">
-                                                <strong>{{ game1.team }}</strong>: {{ game1.score }}
-                                            </div>
-                                        </div>
-                                    {% endif %}
-                                </div>
-                                {% set boxscores = nba_boxscores | selectattr("team", "in", [winner.team, loser.team]) | list %}
-                                {% if boxscores %}
-                                <div class="boxscore row">
-                                <table class="table">
-                                <thead>
-                                <tr>
-                                    <th scope="col">Q1</th>
-                                    <th scope="col">Q2</th>
-                                    <th scope="col">Q3</th>
-                                    <th scope="col">Q4</th>
-                                    <th scope="col">TOT</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                {% for stat in boxscores %}
-                                <tr>
-                                    <td>{{ stat.Q1 }}</td>
-                                    <td>{{ stat.Q2 }}</td>
-                                    <td>{{ stat.Q3 }}</td>
-                                    <td>{{ stat.Q4 }}</td>
-                                    <td>{{ stat.Q1 + stat.Q2 + stat.Q3 + stat.Q4 }}</td>
-                                </tr>
-                                {% endfor %}
-                                </tbody>
-                                </table>
-                                </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>  
-    </div>
+{% set player_count = dashboard_metrics.player_count %}
+{% set game_count = dashboard_metrics.game_count %}
+{% set top_scorer = dashboard_metrics.top_scorer %}
+{% set latest_team_count = dashboard_metrics.team_count %}
 
-    
-
-
-    <!-- Right Column -->
-    <div class="col-md-8 col-12">
-        <div class="player-stats-container mt-4 me-4">
-            <div class="player-searchbox mt-2">
-                <input type="text" id="searchBox" class="form-control mb-3" placeholder="Search by player name...">
-                <div class="table-stats-container">
-                    <div class="table-responsive">
-                        <table class="table table-striped table-bordered" id="statsTable">
-                            <thead class="table-dark">
-                                <tr>
-                                    {% for key in total_stats[0].keys() %}
-                                        <th>{{ key }}</th>
-                                    {% endfor %}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for row in total_stats %}
-                                    <tr>
-                                        {% for value in row.values() %}
-                                            <td>{{ value | safe }}</td>
-                                        {% endfor %}
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table> 
-                    </div>
-                </div>
-            </div>
-            </div>
+<section class="dashboard-page">
+    <div class="dashboard-header">
+        <div>
+            <p class="eyebrow">NBA analytics</p>
+            <h1 class="dashboard-title">Performance dashboard</h1>
+            <p class="dashboard-subtitle">Daily scores, season totals, and player production in one workspace.</p>
+        </div>
+        <div class="dashboard-actions">
+            <a class="btn btn-primary" href="{{ url_for('views.prediction') }}">Run Prediction</a>
         </div>
     </div>
-</div>
-</div>
 
+    <div class="metric-grid" aria-label="Dashboard metrics">
+        <div class="metric-card">
+            <div class="metric-label">Games Loaded</div>
+            <div class="metric-value">{{ game_count }}</div>
+            <div class="metric-note">Daily scoreboard matchups</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Players</div>
+            <div class="metric-value">{{ player_count }}</div>
+            <div class="metric-note">Latest totals dataset</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Teams</div>
+            <div class="metric-value">{{ latest_team_count }}</div>
+            <div class="metric-note">Represented in table</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Top Scorer</div>
+            <div class="metric-value">{{ top_scorer.Player if top_scorer else '-' }}</div>
+            <div class="metric-note">{{ top_scorer.PTS|int if top_scorer else '-' }} season points</div>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <aside class="panel">
+            <div class="panel-header">
+                <div>
+                    <h2 class="panel-title">Daily Games</h2>
+                    <p class="panel-subtitle">Scores and quarter splits</p>
+                </div>
+                {% if data_fetch_required %}
+                    <span class="game-status">Updating</span>
+                {% endif %}
+            </div>
+
+            {% if data_fetch_required %}
+                <div id="daily-games-loading" class="alert alert-info status-empty" role="status">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="spinner-border spinner-border-sm" aria-hidden="true"></div>
+                        <div>Fetching latest NBA scores and boxscores.</div>
+                    </div>
+                </div>
+            {% elif not nba_games %}
+                <div class="alert alert-warning status-empty" role="alert">
+                    No NBA games data is available yet.
+                </div>
+            {% else %}
+                <div class="game-list">
+                    {% for i in range(0, nba_games|length, 2) %}
+                        {% set game1 = nba_games[i] %}
+                        {% set game2 = nba_games[i + 1] if i + 1 < nba_games|length else none %}
+                        {% set score1 = game1.get('score', 0) %}
+                        {% set score2 = game2.get('score', 0) if game2 else 0 %}
+                        {% set winner = game1 if not game2 or score1 >= score2 else game2 %}
+                        {% set loser = game2 if game2 and score1 >= score2 else game1 if game2 else none %}
+                        {% set boxscores = nba_boxscores | selectattr("team", "in", [winner.team, loser.team if loser else none]) | list %}
+
+                        <article class="game-card">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="game-status">{{ winner.state or 'Scheduled' }}</span>
+                                <span class="panel-subtitle">{{ winner.game_time_utc[:10] if winner.game_time_utc else '' }}</span>
+                            </div>
+
+                            <div class="team-row">
+                                <img src="{{ url_for('static', filename='img/' ~ winner.team_logo) }}"
+                                     alt="{{ winner.team }} logo"
+                                     class="team-logo">
+                                <div class="team-name">{{ winner.team }}</div>
+                                <div class="team-score">{{ winner.score }}</div>
+                            </div>
+
+                            {% if loser %}
+                                <div class="team-row is-loser">
+                                    <img src="{{ url_for('static', filename='img/' ~ loser.team_logo) }}"
+                                         alt="{{ loser.team }} logo"
+                                         class="team-logo">
+                                    <div class="team-name">{{ loser.team }}</div>
+                                    <div class="team-score">{{ loser.score }}</div>
+                                </div>
+                            {% endif %}
+
+                            {% if boxscores %}
+                                <div class="mini-boxscore table-responsive">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>Q1</th>
+                                                <th>Q2</th>
+                                                <th>Q3</th>
+                                                <th>Q4</th>
+                                                {% if boxscores[0].get('OT') is not none %}<th>OT</th>{% endif %}
+                                                {% if boxscores[0].get('2OT') is not none %}<th>2OT</th>{% endif %}
+                                                {% if boxscores[0].get('3OT') is not none %}<th>3OT</th>{% endif %}
+                                                <th>TOT</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for stat in boxscores %}
+                                                <tr>
+                                                    <td>{{ stat.Q1 }}</td>
+                                                    <td>{{ stat.Q2 }}</td>
+                                                    <td>{{ stat.Q3 }}</td>
+                                                    <td>{{ stat.Q4 }}</td>
+                                                    {% if stat.get('OT') is not none %}<td>{{ stat.OT }}</td>{% endif %}
+                                                    {% if stat.get('2OT') is not none %}<td>{{ stat['2OT'] }}</td>{% endif %}
+                                                    {% if stat.get('3OT') is not none %}<td>{{ stat['3OT'] }}</td>{% endif %}
+                                                    <td>{{ stat.Q1 + stat.Q2 + stat.Q3 + stat.Q4 + stat.get('OT', 0) + stat.get('2OT', 0) + stat.get('3OT', 0) }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% endif %}
+                        </article>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </aside>
+
+        <section class="panel">
+            <div class="panel-header">
+                <div>
+                    <h2 class="panel-title">Player Totals</h2>
+                    <p class="panel-subtitle">Latest season totals from SQLite</p>
+                </div>
+            </div>
+
+            {% if total_stats %}
+                <div class="stats-toolbar">
+                    <div class="search-field">
+                        <input type="text" id="searchBox" class="form-control" placeholder="Search player">
+                    </div>
+                    <div class="table-meta">
+                        <span id="visibleRows">{{ player_count }}</span> of {{ player_count }} players
+                    </div>
+                </div>
+
+                <div class="table-responsive stats-table-wrap">
+                    <table class="table table-striped stats-table" id="statsTable">
+                        <thead>
+                            <tr>
+                                {% for key in total_stats[0].keys() %}
+                                    <th>{{ key }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in total_stats %}
+                                <tr>
+                                    {% for value in row.values() %}
+                                        <td>{{ value }}</td>
+                                    {% endfor %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-warning status-empty" role="alert">
+                    No player totals data is available. Run the scraper or add a players_data CSV under data/totals.
+                </div>
+            {% endif %}
+        </section>
+    </div>
+</section>
 {% endblock %}
+
 {% block script_block %}
 <script>
+    const dataFetchRequired = {{ data_fetch_required | tojson }};
+
+    async function refreshDailyGames() {
+        const loading = document.getElementById("daily-games-loading");
+
+        try {
+            const response = await fetch("{{ url_for('views.refresh_daily_games') }}");
+            const result = await response.json();
+
+            if (!response.ok || result.status !== "ok") {
+                throw new Error(result.message || "Failed to fetch NBA data.");
+            }
+
+            window.location.reload();
+        } catch (error) {
+            if (loading) {
+                loading.className = "alert alert-danger status-empty";
+                loading.innerHTML = `Could not fetch NBA data: ${error.message}`;
+            }
+        }
+    }
+
+    if (dataFetchRequired) {
+        refreshDailyGames();
+    }
+
     const searchBox = document.getElementById("searchBox");
-    const table = document.getElementById("statsTable").getElementsByTagName("tbody")[0];
-    const wrapper = table.parentNode;
-    console.log("wrapper", wrapper);
-    const maxRows = 10;
-    let height = 0;
+    const statsTable = document.getElementById("statsTable");
+    const visibleRows = document.getElementById("visibleRows");
 
-    searchBox.addEventListener("keyup", function() {
-        const query = searchBox.value.toLowerCase();
-        
-        const rows = table.getElementsByTagName("tr");
+    if (searchBox && statsTable) {
+        const tableBody = statsTable.getElementsByTagName("tbody")[0];
+        const rows = Array.from(tableBody.getElementsByTagName("tr"));
 
-        for (let row of rows) {
-            const playerName = row.cells[1].textContent.toLowerCase(); // assumes Player is the 1st column
-            
-            row.style.display = playerName.includes(query) ? "" : "none";
-        }
-    });
+        searchBox.addEventListener("input", function() {
+            const query = searchBox.value.trim().toLowerCase();
+            let visibleCount = 0;
 
-    for (let i = 0; i < Math.min(maxRows, table.rows.length); i++) {
-        height += table.rows[i].clientHeight;
-        console.log("wrapper", height);
-        }
+            rows.forEach((row) => {
+                const playerName = row.cells[1]?.textContent.toLowerCase() || "";
+                const isVisible = playerName.includes(query);
+                row.style.display = isVisible ? "" : "none";
+                if (isVisible) {
+                    visibleCount += 1;
+                }
+            });
 
-        wrapper.style.maxHeight = height + "px";
-        wrapper.style.overflowY = "auto"; // make sure it scrolls
+            if (visibleRows) {
+                visibleRows.textContent = visibleCount;
+            }
+        });
+    }
 </script>
 {% endblock %}
-

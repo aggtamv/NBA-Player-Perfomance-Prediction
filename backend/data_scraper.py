@@ -1,11 +1,81 @@
 import logging
+from urllib import response
 import requests
 import pandas as pd
 from io import StringIO
 import os
 import time
 from datetime import date, timedelta, datetime
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from bs4 import BeautifulSoup
 
+NBA_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/115.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Origin": "https://www.nba.com",
+    "Referer": "https://www.nba.com/",
+}
+
+TEAM_LOGOS = {
+    "Atlanta Hawks": "Atlanta.svg",
+    "Boston Celtics": "Boston.svg",
+    "Brooklyn Nets": "Brooklyn.svg",
+    "Charlotte Hornets": "charlotte-hornets.svg",
+    "Chicago Bulls": "Chicago.svg",
+    "Cleveland Cavaliers": "Cleveland.svg",
+    "Dallas Mavericks": "Dallas.svg",
+    "Denver Nuggets": "Denver.svg",
+    "Detroit Pistons": "nba.svg",
+    "Golden State Warriors": "Golden_State.svg",
+    "Houston Rockets": "Houston.svg",
+    "Indiana Pacers": "Indiana.svg",
+    "LA Clippers": "LA_Clippers.svg",
+    "Los Angeles Clippers": "LA_Clippers.svg",
+    "Los Angeles Lakers": "LA_Lakers.svg",
+    "Memphis Grizzlies": "Memphis.svg",
+    "Miami Heat": "Miami.svg",
+    "Milwaukee Bucks": "Milwaukee.svg",
+    "Minnesota Timberwolves": "Minnesota.svg",
+    "New Orleans Pelicans": "New_Orleans.svg",
+    "New York Knicks": "New York.svg",
+    "Oklahoma City Thunder": "Oklahoma_City.svg",
+    "Orlando Magic": "Orlando.svg",
+    "Philadelphia 76ers": "philidephia-ers.svg",
+    "Phoenix Suns": "Phoenix.svg",
+    "Portland Trail Blazers": "Portland.svg",
+    "Sacramento Kings": "Sacramento.svg",
+    "San Antonio Spurs": "San_Antonio.svg",
+    "Toronto Raptors": "toronto-raptors.svg",
+    "Utah Jazz": "Utah.svg",
+    "Washington Wizards": "Washington.svg",
+}
+
+MOJIBAKE_MARKERS = ("Ã", "Ä", "Å", "Â", "â") + tuple(chr(code) for code in range(0x80, 0xA0))
+
+def repair_mojibake(value):
+    if not isinstance(value, str) or not any(marker in value for marker in MOJIBAKE_MARKERS):
+        return value
+
+    try:
+        return value.encode("latin1").decode("utf-8")
+    except UnicodeError:
+        return value
+
+def repair_dataframe_text(df):
+    text_columns = df.select_dtypes(include=["object", "string"]).columns
+    if len(text_columns) == 0:
+        return df
+
+    df = df.copy()
+    for column in text_columns:
+        df[column] = df[column].map(repair_mojibake)
+    return df
 
 def player_stats(choice: list = None):
     try:
@@ -36,7 +106,7 @@ def player_stats(choice: list = None):
                     continue
                 
                 # First tables is players data
-                nba_data = tables[0]
+                nba_data = repair_dataframe_text(tables[0])
 
                 # If the DataFrame is empty, skip it
                 if nba_data.empty:
@@ -67,8 +137,18 @@ def daily_matchups():
         month = current_date.month
         year = current_date.year
         url = f'https://www.basketball-reference.com/boxscores/'
-        response = requests.get(url)
-                
+        headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/115.0.0.0 Safari/537.36"
+            )
+        }
+        response = requests.get(url, headers=headers)     
+        print(f"Request URL: {url}")
+        print(f"Response Status Code: {response.status_code}")
+        print(f"Response Headers: {response.headers}")
+        print(f"Response Content (first 500 chars): {response.text[:500]}")
         # Check if request was successful
         if response.status_code != 200:
             print(response)
@@ -98,6 +178,255 @@ def daily_matchups():
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
 
+def _format_game_date(game_date=None):
+    if game_date is None:
+        return date.today().isoformat()
+    if isinstance(game_date, datetime):
+        return game_date.date().isoformat()
+    if isinstance(game_date, date):
+        return game_date.isoformat()
+    return str(game_date)
+
+def _nba_get_json(url, params=None):
+    response = requests.get(url, params=params, headers=NBA_HEADERS, timeout=30)
+    response.raise_for_status()
+    return response.json()
+
+def _extract_scoreboard_games(scoreboard_response):
+    if isinstance(scoreboard_response, dict):
+        if "scoreboard" in scoreboard_response:
+            return scoreboard_response.get("scoreboard", {}).get("games", [])
+        if "games" in scoreboard_response:
+            return scoreboard_response.get("games", [])
+    return []
+
+def _team_name(team):
+    city = team.get("teamCity", "")
+    name = team.get("teamName", "")
+    return f"{city} {name}".strip()
+
+def _period_score_map(team):
+    scores = {"Q1": 0, "Q2": 0, "Q3": 0, "Q4": 0}
+    for period in team.get("periods", []) or []:
+        number = int(period.get("period", 0) or 0)
+        if number <= 0:
+            continue
+        if number <= 4:
+            key = f"Q{number}"
+        elif number == 5:
+            key = "OT"
+        else:
+            key = f"{number - 4}OT"
+        scores[key] = int(period.get("score", 0) or 0)
+    return scores
+
+def _team_score_row(game, team, opponent, side):
+    team_name = _team_name(team)
+    return {
+        "game_id": game.get("gameId"),
+        "game_code": game.get("gameCode"),
+        "team": team_name,
+        "team_tricode": team.get("teamTricode"),
+        "opponent": _team_name(opponent),
+        "home_away": side,
+        "team_logo": TEAM_LOGOS.get(team_name, "nba.svg"),
+        "score": int(team.get("score", 0) or 0),
+        "state": game.get("gameStatusText", ""),
+        "game_status": game.get("gameStatus"),
+        "game_time_utc": game.get("gameTimeUTC"),
+        "series_text": game.get("seriesText", ""),
+    }
+
+def _team_boxscore_row(game, team, opponent, side):
+    row = _team_score_row(game, team, opponent, side)
+    row.update(_period_score_map(team))
+    team_stats = team.get("statistics") or {}
+    for key, value in team_stats.items():
+        if key not in row:
+            row[key] = value
+    return row
+
+def _player_boxscore_rows(game, team, opponent, side):
+    rows = []
+    for player in team.get("players", []) or []:
+        row = {
+            "game_id": game.get("gameId"),
+            "game_code": game.get("gameCode"),
+            "team": _team_name(team),
+            "team_tricode": team.get("teamTricode"),
+            "opponent": _team_name(opponent),
+            "home_away": side,
+            "person_id": player.get("personId"),
+            "player": player.get("name"),
+            "first_name": player.get("firstName"),
+            "family_name": player.get("familyName"),
+            "jersey_num": player.get("jerseyNum"),
+            "starter": player.get("starter"),
+            "played": player.get("played"),
+            "status": player.get("status"),
+            "not_playing_reason": player.get("notPlayingReason"),
+            "not_playing_description": player.get("notPlayingDescription"),
+        }
+        row.update(player.get("statistics") or {})
+        rows.append(row)
+    return rows
+
+def fetch_nba_daily_boxscores(game_date=None, save=True):
+    """
+    Fetch NBA.com scores and boxscores for a specific date.
+
+    Returns:
+        tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        games, team boxscores, player boxscores.
+    """
+    requested_game_date = _format_game_date(game_date) if game_date is not None else None
+    scoreboard_url = "https://stats.nba.com/stats/scoreboardv3"
+    live_scoreboard_url = "https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json"
+
+    if requested_game_date is None:
+        scoreboard = _nba_get_json(live_scoreboard_url)
+        game_date = scoreboard.get("scoreboard", {}).get("gameDate") or date.today().isoformat()
+    else:
+        game_date = requested_game_date
+        try:
+            scoreboard = _nba_get_json(
+                scoreboard_url,
+                params={"GameDate": game_date, "LeagueID": "00"},
+            )
+        except requests.RequestException as exc:
+            print(f"stats.nba.com scoreboard failed: {exc}")
+            scoreboard = _nba_get_json(live_scoreboard_url)
+            cdn_game_date = scoreboard.get("scoreboard", {}).get("gameDate")
+            if cdn_game_date != game_date:
+                raise ValueError(
+                    f"NBA live scoreboard is for {cdn_game_date}, not requested date {game_date}."
+                ) from exc
+
+    games = _extract_scoreboard_games(scoreboard)
+
+    games_rows = []
+    team_boxscore_rows = []
+    player_boxscore_rows = []
+    per_game_dir = os.path.join("data", "boxscores", game_date)
+
+    for game in games:
+        game_id = game.get("gameId")
+        boxscore_game = game
+        if game_id:
+            boxscore_url = f"https://cdn.nba.com/static/json/liveData/boxscore/boxscore_{game_id}.json"
+            try:
+                boxscore = _nba_get_json(boxscore_url)
+                boxscore_game = boxscore.get("game", game)
+            except requests.RequestException as exc:
+                print(f"Failed to fetch boxscore for game {game_id}: {exc}")
+
+        home = boxscore_game.get("homeTeam") or game.get("homeTeam") or {}
+        away = boxscore_game.get("awayTeam") or game.get("awayTeam") or {}
+
+        games_rows.append(_team_score_row(boxscore_game, away, home, "away"))
+        games_rows.append(_team_score_row(boxscore_game, home, away, "home"))
+
+        current_team_rows = [
+            _team_boxscore_row(boxscore_game, away, home, "away"),
+            _team_boxscore_row(boxscore_game, home, away, "home"),
+        ]
+        team_boxscore_rows.extend(current_team_rows)
+
+        current_player_rows = []
+        current_player_rows.extend(_player_boxscore_rows(boxscore_game, away, home, "away"))
+        current_player_rows.extend(_player_boxscore_rows(boxscore_game, home, away, "home"))
+        player_boxscore_rows.extend(current_player_rows)
+
+        if save and game_id:
+            os.makedirs(per_game_dir, exist_ok=True)
+            pd.DataFrame(current_team_rows).to_csv(
+                os.path.join(per_game_dir, f"{game_id}_team_boxscore.csv"),
+                index=False,
+                encoding="utf-8-sig",
+            )
+            pd.DataFrame(current_player_rows).to_csv(
+                os.path.join(per_game_dir, f"{game_id}_player_boxscore.csv"),
+                index=False,
+                encoding="utf-8-sig",
+            )
+
+    games_df = pd.DataFrame(games_rows)
+    team_boxscores_df = pd.DataFrame(team_boxscore_rows)
+    player_boxscores_df = pd.DataFrame(player_boxscore_rows)
+
+    if save:
+        daily_dir = os.path.join("data", "daily_games")
+        os.makedirs(per_game_dir, exist_ok=True)
+        os.makedirs(daily_dir, exist_ok=True)
+        games_df.to_csv(
+            os.path.join(daily_dir, f"games_{game_date}.csv"),
+            index=False,
+            encoding="utf-8-sig",
+        )
+        team_boxscores_df.to_csv(
+            os.path.join(daily_dir, f"boxscores_{game_date}.csv"),
+            index=False,
+            encoding="utf-8-sig",
+        )
+        player_boxscores_df.to_csv(
+            os.path.join(per_game_dir, f"player_boxscores_{game_date}.csv"),
+            index=False,
+            encoding="utf-8-sig",
+        )
+
+    return games_df, team_boxscores_df, player_boxscores_df
+
+def get_basketball_reference_data():
+    try:
+        # Setup headless Chrome
+        options = Options()
+        options.add_argument('--headless')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--no-sandbox')
+
+        driver = webdriver.Chrome(options=options)
+        driver.get("https://www.basketball-reference.com/boxscores/")
+        html = driver.page_source
+        driver.quit()
+
+        # Extract all tables using pandas
+        tables = pd.read_html(StringIO(html))
+
+        # Use lists to collect all matching tables
+        games_list = []
+        boxscores_list = []
+        
+        print(tables)
+        for table in tables:
+            if table.shape == (2, 3) and table.iloc[0, 2] == 'Final':
+                # Format and append this game
+                game = table.copy()
+                game.columns = ['team', 'score', 'state']
+                game['score'] = pd.to_numeric(game['score'], errors='coerce').fillna(0).astype(int)
+                game['state'] = game['state'].fillna("")
+                games_list.extend(game.to_dict(orient='records'))
+                
+            elif table.shape[0] == 2 and table.shape[1] >= 5:  # Changed this line!
+                # Format and append this boxscore (handles OT games too)
+                boxscore = table.copy()
+                
+                # Dynamically get all quarter columns
+                col_names = ['team'] + [f'Q{i}' if i <= 4 else table.columns[i] 
+                                        for i in range(1, len(table.columns))]
+                boxscore.columns = col_names
+                
+                # Convert all numeric columns
+                for col in boxscore.columns[1:]:
+                    boxscore[col] = pd.to_numeric(boxscore[col], errors='coerce').fillna(0).astype(int)
+                    
+                boxscores_list.extend(boxscore.to_dict(orient='records'))
+
+        return games_list, boxscores_list
+
+    except Exception as e:
+        print(f"❌ Error scraping Basketball Reference: {e}")
+        return [], []
+
 def get_csv(df_name, folder, current_date=None):
     from datetime import date, timedelta
 
@@ -111,9 +440,22 @@ def get_csv(df_name, folder, current_date=None):
     parent_folder = f'data/{folder}'
     file_path = os.path.join(parent_folder, df_name)
     # Try loading the saved CSVs
+    if not os.path.exists(file_path):
+        prefix = f'{df_name.rsplit("_", 1)[0]}_'
+        if os.path.isdir(parent_folder):
+            files = [
+                os.path.join(parent_folder, f)
+                for f in os.listdir(parent_folder)
+                if f.startswith(prefix) and f.endswith('.csv')
+            ]
+            if files:
+                file_path = max(files, key=os.path.getmtime)
+                print(f"Using latest available file: {file_path}")
+
     if os.path.exists(file_path):
         print("Loading data from saved CSVs")
         df = pd.read_csv(file_path, encoding='utf-8-sig')
+        df = repair_dataframe_text(df)
         
         if folder == 'totals':
             df = df[df['Player'] != 'League Average']
@@ -214,6 +556,7 @@ def create_sample(df_name: str = 'PlayerStatistics', folder: str = 'data/samples
     if os.path.exists(file_path):
         print("✅ File found, loading...")
         df = pd.read_csv(file_path, encoding='utf-8-sig', low_memory=False)
+        df = repair_dataframe_text(df)
 
         # Define your inference columns
         inference_cols = [
@@ -340,5 +683,5 @@ def get_shooting_avg():
 # To execute locally
 if __name__ == "__main__":
     #message = player_stats(['totals'])
-    message = get_shooting_avg()
+    message = get_basketball_reference_data()
     print(message)
