@@ -13,6 +13,7 @@
 /NBA Player Perfomance Prediction.ipynb
 /analysis.py
 /data_scraper.py
+/nba_model.py
 nba_app/static/uploads/input_sample.csv
 
 # === Runtime user uploads (prediction feature) ===
