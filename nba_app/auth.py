@@ -8,6 +8,7 @@ from werkzeug.security import generate_password_hash
 from .models import db, User, OAuth
 from .forms import LoginForm, RegisterForm
 from nba_app import google_bp
+from backend.scraper_client import refresh_latest_daily_games_if_needed
 
 import os
 from .config import Config
@@ -16,6 +17,9 @@ auth = Blueprint("auth", __name__)
 @auth.route("/login", methods=["GET", "POST"])
 def login():
     form = LoginForm()
+    if request.method == "GET":
+        refresh_latest_daily_games_if_needed(background=True)
+
     if form.validate_on_submit():
         email = form.email.data
         password = form.password.data
@@ -24,6 +28,7 @@ def login():
         if user:
             if user.verify_password(password):
                 login_user(user, remember=form.remember.data)
+                refresh_latest_daily_games_if_needed(background=True)
                 flash("Logged in successfully!", "success")
                 return redirect(url_for("views.home"))
             elif not user.password_hash:

@@ -23,6 +23,29 @@
     --font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
 }
 
+[data-theme="dark"] {
+    --app-bg: #0b1020;
+    --surface: rgba(17, 24, 39, 0.92);
+    --surface-muted: #111827;
+    --surface-blue: rgba(23, 64, 139, 0.28);
+    --surface-red: rgba(201, 8, 42, 0.18);
+    --surface-gold: rgba(217, 145, 27, 0.18);
+    --border: rgba(148, 163, 184, 0.32);
+    --border-soft: rgba(148, 163, 184, 0.18);
+    --text: #e5e7eb;
+    --muted: #9ca3af;
+    --accent: #7fb0ff;
+    --accent-strong: #a8c8ff;
+    --accent-soft: rgba(127, 176, 255, 0.16);
+    --nba-red: #ff5d75;
+    --nba-red-soft: rgba(255, 93, 117, 0.16);
+    --gold: #f5b84b;
+    --success: #4ade80;
+    --danger: #f87171;
+    --warning: #fbbf24;
+    --shadow: 0 18px 38px rgba(0, 0, 0, 0.36);
+}
+
 * {
     letter-spacing: 0;
 }
@@ -38,6 +61,15 @@ body {
     color: var(--text);
     font-family: var(--font-family);
     overflow-x: hidden;
+}
+
+[data-theme="dark"] body {
+    background:
+        radial-gradient(circle at 12% 8%, rgba(255, 93, 117, 0.16), transparent 26%),
+        radial-gradient(circle at 88% 14%, rgba(127, 176, 255, 0.18), transparent 30%),
+        linear-gradient(90deg, rgba(8, 13, 28, 0.88), rgba(11, 16, 32, 0.82)),
+        url("../img/basketball-pencil-bg.png") center top / cover fixed no-repeat,
+        var(--app-bg);
 }
 
 body::before {
@@ -63,6 +95,10 @@ body::before {
     background: rgba(249, 251, 255, 0.78);
     border-bottom: 1px solid var(--border);
     backdrop-filter: blur(14px);
+}
+
+[data-theme="dark"] .app-header {
+    background: rgba(11, 16, 32, 0.82);
 }
 
 #navbar-main {
@@ -117,8 +153,80 @@ body::before {
 
 .app-user-menu {
     display: flex;
+    align-items: center;
+    gap: 0.55rem;
     justify-content: flex-end;
     min-width: 48px;
+}
+
+.theme-toggle {
+    border: 0;
+    background: transparent;
+    padding: 0;
+}
+
+.theme-toggle-track {
+    position: relative;
+    display: inline-grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    width: 58px;
+    height: 32px;
+    padding: 3px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.7);
+    box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+[data-theme="dark"] .theme-toggle-track {
+    background: rgba(17, 24, 39, 0.9);
+}
+
+.theme-toggle-thumb {
+    position: absolute;
+    left: 3px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.22);
+    transition: transform 180ms ease, background 180ms ease;
+}
+
+[data-theme="dark"] .theme-toggle-thumb {
+    transform: translateX(26px);
+    background: var(--gold);
+}
+
+.theme-toggle-icon {
+    position: relative;
+    z-index: 2;
+    width: 14px;
+    height: 14px;
+    justify-self: center;
+}
+
+.theme-toggle-sun {
+    border-radius: 50%;
+    background: #f59e0b;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
+}
+
+.theme-toggle-moon {
+    border-radius: 50%;
+    background: #64748b;
+}
+
+.theme-toggle-moon::after {
+    content: "";
+    position: absolute;
+    right: -2px;
+    top: -1px;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.92);
 }
 
 .user-initials {
@@ -467,6 +575,14 @@ body::before {
     overflow: auto;
 }
 
+/* Player Totals table specifically: keep it clear of the screen bottom.
+   The precise max-height is set by JS (see index.html) to fit the viewport;
+   this calc is a fallback before the script runs. */
+.stats-table-wrap:has(#statsTable) {
+    max-height: calc(100vh - 320px);
+    margin-bottom: 1.5rem;
+}
+
 .stats-table {
     margin: 0;
     border-collapse: separate;
@@ -617,9 +733,174 @@ body::before {
     padding: 0.75rem;
 }
 
+.metric-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0 0.75rem 0.75rem;
+}
+
+.metric-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    margin: 0;
+    cursor: pointer;
+}
+
+.metric-toggle input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.metric-toggle span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 32px;
+    padding: 0.38rem 0.7rem;
+    border: 1px solid rgba(148, 163, 184, 0.65);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.78);
+    color: #475569;
+    font-size: 0.82rem;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    transition: background 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.metric-toggle:hover span {
+    border-color: rgba(23, 64, 139, 0.45);
+    color: var(--accent);
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+    transform: translateY(-1px);
+}
+
+.metric-toggle input:focus-visible + span {
+    outline: 3px solid rgba(23, 64, 139, 0.18);
+    outline-offset: 2px;
+}
+
+.metric-toggle input:checked + span {
+    border-color: rgba(23, 64, 139, 0.7);
+    background: linear-gradient(180deg, rgba(23, 64, 139, 0.96), rgba(12, 45, 102, 0.96));
+    color: #ffffff;
+    box-shadow: 0 8px 18px rgba(23, 64, 139, 0.22);
+}
+
 .plotly-chart {
     width: 100%;
     min-height: 420px;
+}
+
+.player-chip-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.55rem;
+    padding: 0 0.25rem 0.25rem;
+}
+
+.player-chip {
+    display: grid;
+    grid-template-columns: auto 34px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.5rem;
+    position: relative;
+    overflow: hidden;
+    min-height: 44px;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid rgba(207, 218, 232, 0.9);
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(238, 245, 255, 0.78));
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.player-chip::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.38));
+}
+
+.player-chip-bg-logo {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    z-index: 1;
+    width: 92px;
+    height: 92px;
+    object-fit: contain;
+    opacity: 0.28;
+    transform: translateY(-50%) rotate(-8deg);
+    filter: saturate(1.2);
+}
+
+.player-chip-rank {
+    position: relative;
+    z-index: 2;
+    color: var(--accent);
+    font-size: 0.76rem;
+    font-weight: 800;
+}
+
+.player-chip-avatar {
+    position: relative;
+    z-index: 2;
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #ffffff;
+    font-size: 0.74rem;
+    font-weight: 800;
+}
+
+.player-chip-identity {
+    position: relative;
+    z-index: 2;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.05rem;
+}
+
+.player-chip-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text);
+    font-size: 0.84rem;
+    font-weight: 760;
+}
+
+.player-chip-team {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--muted);
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
+.player-chip-stat {
+    position: relative;
+    z-index: 2;
+    padding: 0.22rem 0.42rem;
+    border-radius: 999px;
+    background: var(--nba-red-soft);
+    color: var(--nba-red);
+    font-size: 0.72rem;
+    font-weight: 800;
+    white-space: nowrap;
 }
 
 .stats-tabs .nav-tabs {
@@ -645,6 +926,128 @@ body::before {
 .stats-table-compact .stats-table th:nth-child(2),
 .stats-table-compact .stats-table td:nth-child(2) {
     position: static;
+}
+
+[data-theme="dark"] .dashboard-header {
+    background: rgba(17, 24, 39, 0.66);
+}
+
+[data-theme="dark"] .dashboard-page::before,
+[data-theme="dark"] .page-shell::before {
+    background:
+        linear-gradient(135deg, rgba(127, 176, 255, 0.18), rgba(255, 93, 117, 0.12)),
+        url("../img/basketball-pencil-bg.png") center 34% / cover no-repeat;
+    border-color: rgba(148, 163, 184, 0.22);
+}
+
+[data-theme="dark"] .metric-card:nth-child(1),
+[data-theme="dark"] .metric-card:nth-child(2),
+[data-theme="dark"] .metric-card:nth-child(3),
+[data-theme="dark"] .metric-card:nth-child(4),
+[data-theme="dark"] .game-card,
+[data-theme="dark"] .player-chip {
+    background: linear-gradient(135deg, rgba(17, 24, 39, 0.96), rgba(30, 41, 59, 0.76));
+}
+
+[data-theme="dark"] .panel-header,
+[data-theme="dark"] .stats-toolbar,
+[data-theme="dark"] .stats-tabs .nav-tabs {
+    background: rgba(15, 23, 42, 0.78);
+}
+
+[data-theme="dark"] .chart-panel-body,
+[data-theme="dark"] .panel-body {
+    background: rgba(15, 23, 42, 0.18);
+}
+
+[data-theme="dark"] .stats-table thead th {
+    background: #1f3f78;
+}
+
+[data-theme="dark"] .stats-table tbody td {
+    background: rgba(17, 24, 39, 0.82);
+    color: var(--text);
+}
+
+[data-theme="dark"] .stats-table tbody tr:nth-child(even) td {
+    background: rgba(15, 23, 42, 0.92);
+}
+
+[data-theme="dark"] .stats-table td:nth-child(2),
+[data-theme="dark"] .stats-table tbody tr:nth-child(even) td:nth-child(2) {
+    background: rgba(15, 23, 42, 0.98);
+}
+
+[data-theme="dark"] .stats-table tbody tr:hover td,
+[data-theme="dark"] .stats-table tbody tr:hover td:nth-child(2) {
+    background: rgba(37, 99, 235, 0.18);
+}
+
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .form-select,
+[data-theme="dark"] .search-field input {
+    background-color: rgba(15, 23, 42, 0.88);
+    border-color: var(--border);
+    color: var(--text);
+}
+
+[data-theme="dark"] .form-control::placeholder,
+[data-theme="dark"] .search-field input::placeholder {
+    color: var(--muted);
+}
+
+[data-theme="dark"] .autocomplete-menu,
+[data-theme="dark"] .dropdown-menu {
+    background: rgba(17, 24, 39, 0.98);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .dropdown-item {
+    color: var(--text);
+}
+
+[data-theme="dark"] .dropdown-item:hover,
+[data-theme="dark"] .dropdown-item:focus,
+[data-theme="dark"] .autocomplete-option:hover,
+[data-theme="dark"] .autocomplete-option.is-active {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+}
+
+[data-theme="dark"] .prediction-result {
+    background: rgba(34, 197, 94, 0.12);
+    color: #bbf7d0;
+}
+
+[data-theme="dark"] .metric-toggle span {
+    background: rgba(15, 23, 42, 0.72);
+    color: var(--muted);
+}
+
+[data-theme="dark"] .player-chip::before {
+    background: linear-gradient(90deg, rgba(17, 24, 39, 0.88), rgba(17, 24, 39, 0.36));
+}
+
+[data-theme="dark"] .player-chip-name {
+    color: var(--text);
+}
+
+[data-theme="dark"] .player-chip-bg-logo {
+    opacity: 0.34;
+}
+
+/* Google login button: btn-outline-dark's default text is near-black,
+   which is unreadable on the dark background until hovered. */
+[data-theme="dark"] .btn-outline-dark {
+    color: var(--text);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .btn-outline-dark:hover,
+[data-theme="dark"] .btn-outline-dark:focus {
+    color: #0b1020;
+    background-color: var(--text);
+    border-color: var(--text);
 }
 
 @media (max-width: 1200px) {

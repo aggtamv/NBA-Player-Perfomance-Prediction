@@ -17,23 +17,23 @@
 
     <div class="metric-grid">
         <div class="metric-card">
-            <div class="metric-label">Years Covered</div>
-            <div class="metric-value">{{ stats_metrics.year_range or '-' }}</div>
-            <div class="metric-note">Shooting averages dataset</div>
+            <div class="metric-label">Gold Players</div>
+            <div class="metric-value">{{ stats_metrics.gold_players or '-' }}</div>
+            <div class="metric-note">From PySpark recent-form table</div>
         </div>
         <div class="metric-card">
-            <div class="metric-label">Latest TS%</div>
-            <div class="metric-value">{{ '%.3f'|format(stats_metrics.latest_ts) if stats_metrics.latest_ts is not none else '-' }}</div>
-            <div class="metric-note">{{ stats_metrics.latest_year or '-' }} league average</div>
+            <div class="metric-label">Top Recent Scorer</div>
+            <div class="metric-value">{{ stats_metrics.gold_top_player or '-' }}</div>
+            <div class="metric-note">{{ '%.1f PPG over prior 10'|format(stats_metrics.gold_top_points) if stats_metrics.gold_top_points is not none else 'Gold table unavailable' }}</div>
         </div>
         <div class="metric-card">
             <div class="metric-label">Latest eFG%</div>
-            <div class="metric-value">{{ '%.3f'|format(stats_metrics.latest_efg) if stats_metrics.latest_efg is not none else '-' }}</div>
-            <div class="metric-note">{{ stats_metrics.latest_year or '-' }} effective rate</div>
+            <div class="metric-value">{{ '%.1f%%'|format(stats_metrics.latest_efg) if stats_metrics.latest_efg is not none else '-' }}</div>
+            <div class="metric-note">{{ '%+.1f pts vs prior year'|format(stats_metrics.latest_efg_delta) if stats_metrics.latest_efg_delta is not none else 'No prior-year delta' }}</div>
         </div>
         <div class="metric-card">
             <div class="metric-label">3PAr Change</div>
-            <div class="metric-value">{{ '%+.3f'|format(stats_metrics.three_point_rate_change) if stats_metrics.three_point_rate_change is not none else '-' }}</div>
+            <div class="metric-value">{{ '%+.1f pts'|format(stats_metrics.three_point_rate_change) if stats_metrics.three_point_rate_change is not none else '-' }}</div>
             <div class="metric-note">Since first tracked season</div>
         </div>
     </div>
@@ -45,6 +45,14 @@
                     <h2 class="panel-title">Raw Shooting Profile</h2>
                     <p class="panel-subtitle">Shot distance mix and make rates</p>
                 </div>
+            </div>
+            <div class="metric-selector" aria-label="Raw shooting metrics">
+                {% for metric in raw_metric_options %}
+                    <label class="metric-toggle">
+                        <input type="checkbox" value="{{ metric }}" data-chart="raw" {% if metric in raw_default_metrics %}checked{% endif %}>
+                        <span>{{ metric }}</span>
+                    </label>
+                {% endfor %}
             </div>
             <div class="chart-panel-body">
                 <div id="rawShootingChart" class="plotly-chart"></div>
@@ -58,11 +66,57 @@
                     <p class="panel-subtitle">League-adjusted shooting and shot mix</p>
                 </div>
             </div>
+            <div class="metric-selector" aria-label="Adjusted shooting metrics">
+                {% for metric in adjusted_metric_options %}
+                    <label class="metric-toggle">
+                        <input type="checkbox" value="{{ metric }}" data-chart="adjusted" {% if metric in adjusted_default_metrics %}checked{% endif %}>
+                        <span>{{ metric }}</span>
+                    </label>
+                {% endfor %}
+            </div>
             <div class="chart-panel-body">
                 <div id="adjustedShootingChart" class="plotly-chart"></div>
             </div>
         </section>
     </div>
+
+    <section class="panel mt-3">
+        <div class="panel-header">
+            <div>
+                <h2 class="panel-title">Player Recent Form</h2>
+                <p class="panel-subtitle">Gold dataset produced by the PySpark medallion pipeline</p>
+            </div>
+            <span class="table-meta">{{ stats_metrics.gold_players or 0 }} players shown</span>
+        </div>
+        <div class="chart-panel-body">
+            <div id="recentFormChart" class="plotly-chart"></div>
+            <div id="recentFormPlayers" class="player-chip-strip" aria-label="Recent form players"></div>
+        </div>
+        <div class="table-responsive stats-table-wrap stats-table-compact">
+            <table class="table table-striped stats-table">
+                <thead>
+                    <tr>
+                        {% for col in recent_form_columns %}
+                            <th>{{ 'Last Opponent' if col == 'opponent' else col }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in recent_form_table %}
+                        <tr>
+                            {% for col in recent_form_columns %}
+                                <td>{{ row[col] }}</td>
+                            {% endfor %}
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="{{ recent_form_columns|length or 1 }}">No Gold recent-form data has been imported yet.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
 
     <section class="panel mt-3">
         <div class="panel-header">
@@ -137,16 +191,182 @@
 {% block script_block %}
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 <script>
-    const rawShootingFigure = {{ shooting_avg_json | safe }};
-    const adjustedShootingFigure = {{ adj_shooting_avg_json | safe }};
+    const rawShootingRows = {{ shooting_avg_json | safe }};
+    const adjustedShootingRows = {{ adj_shooting_avg_json | safe }};
+    const recentFormRows = {{ recent_form_chart_json | safe }};
+    const staticImgBase = "{{ url_for('static', filename='img/') }}";
+    const chartColors = ['#17408b', '#c9082a', '#d9911b', '#15803d', '#6d28d9', '#0f766e', '#0f766e', '#7c2d12', '#334155'];
     const plotConfig = { responsive: true, displayModeBar: false };
 
-    if (rawShootingFigure && rawShootingFigure.data) {
-        Plotly.newPlot("rawShootingChart", rawShootingFigure.data, rawShootingFigure.layout, plotConfig);
+    function chartTheme() {
+        const isDark = document.documentElement.dataset.theme === 'dark';
+        return {
+            text: isDark ? '#e5e7eb' : '#111827',
+            plot: isDark ? 'rgba(15,23,42,0.72)' : 'rgba(255,255,255,0.84)',
+            grid: isDark ? 'rgba(148,163,184,0.22)' : 'rgba(207, 218, 232, 0.7)',
+            axis: isDark ? '#9ca3af' : '#17408b'
+        };
     }
 
-    if (adjustedShootingFigure && adjustedShootingFigure.data) {
-        Plotly.newPlot("adjustedShootingChart", adjustedShootingFigure.data, adjustedShootingFigure.layout, plotConfig);
+    function selectedMetrics(chartName) {
+        return Array.from(document.querySelectorAll(`input[data-chart="${chartName}"]:checked`))
+            .map((input) => input.value);
     }
+
+    function renderMetricChart(elementId, rows, metrics, title) {
+        const theme = chartTheme();
+        const data = metrics.map((metric, index) => ({
+            x: rows.map((row) => row.Year),
+            y: rows.map((row) => row[metric]),
+            name: metric,
+            mode: 'lines+markers',
+            line: { width: 3, color: chartColors[index % chartColors.length] },
+            marker: { size: 6 },
+            hovertemplate: `%{x}<br>${metric}: %{y:.1%}<extra></extra>`
+        }));
+
+        const layout = {
+            title: { text: title, x: 0, xanchor: 'left', font: { size: 15 } },
+            height: 420,
+            margin: { l: 48, r: 24, t: 52, b: 44 },
+            legend: { orientation: 'h', y: -0.18 },
+            font: { family: 'Inter, Segoe UI, Arial', color: theme.text },
+            paper_bgcolor: 'rgba(255,255,255,0)',
+            plot_bgcolor: theme.plot,
+            hovermode: 'x unified',
+            xaxis: { showgrid: false, fixedrange: true },
+            yaxis: { tickformat: '.0%', gridcolor: theme.grid, fixedrange: true }
+        };
+
+        Plotly.react(elementId, data, layout, plotConfig);
+    }
+
+    function updateCharts() {
+        renderMetricChart('rawShootingChart', rawShootingRows, selectedMetrics('raw'), 'Shot Profile and Finishing');
+        renderMetricChart('adjustedShootingChart', adjustedShootingRows, selectedMetrics('adjusted'), 'Efficiency and Shot Mix');
+    }
+
+    function renderRecentFormChart() {
+        const theme = chartTheme();
+        const players = recentFormRows.map((row) => row.player);
+        const ranks = recentFormRows.map((_, index) => `#${index + 1}`);
+        const data = [
+            {
+                x: ranks,
+                y: recentFormRows.map((row) => row.last_10_points_avg),
+                customdata: players,
+                name: 'Points',
+                type: 'bar',
+                marker: { color: '#17408b' },
+                hovertemplate: '%{customdata}<br>Points: %{y:.1f}<extra></extra>'
+            },
+            {
+                x: ranks,
+                y: recentFormRows.map((row) => row.last_10_assists_avg),
+                customdata: players,
+                name: 'Assists',
+                type: 'bar',
+                marker: { color: '#c9082a' },
+                hovertemplate: '%{customdata}<br>Assists: %{y:.1f}<extra></extra>'
+            },
+            {
+                x: ranks,
+                y: recentFormRows.map((row) => row.last_10_reboundsTotal_avg),
+                customdata: players,
+                name: 'Rebounds',
+                type: 'bar',
+                marker: { color: '#d9911b' },
+                hovertemplate: '%{customdata}<br>Rebounds: %{y:.1f}<extra></extra>'
+            }
+        ];
+
+        const layout = {
+            title: { text: 'Top Recent Form Leaders', x: 0, xanchor: 'left', font: { size: 15 } },
+            barmode: 'group',
+            height: 430,
+            margin: { l: 52, r: 24, t: 52, b: 58 },
+            legend: { orientation: 'h', y: -0.16 },
+            font: { family: 'Inter, Segoe UI, Arial', color: theme.text },
+            paper_bgcolor: 'rgba(255,255,255,0)',
+            plot_bgcolor: theme.plot,
+            hovermode: 'closest',
+            xaxis: { fixedrange: true, tickfont: { size: 12, color: theme.axis } },
+            yaxis: { title: 'Prior 10 game average', gridcolor: theme.grid, fixedrange: true }
+        };
+
+        Plotly.react('recentFormChart', data, layout, plotConfig);
+        renderRecentFormPlayers();
+    }
+
+    function initialsForName(name) {
+        return name
+            .split(' ')
+            .filter(Boolean)
+            .slice(0, 2)
+            .map((part) => part[0])
+            .join('')
+            .toUpperCase();
+    }
+
+    function renderRecentFormPlayers() {
+        const container = document.getElementById('recentFormPlayers');
+        if (!container) return;
+
+        container.innerHTML = '';
+        recentFormRows.forEach((row, index) => {
+            const chip = document.createElement('div');
+            chip.className = 'player-chip';
+
+            const logo = document.createElement('img');
+            logo.className = 'player-chip-bg-logo';
+            logo.src = `${staticImgBase}${row.team_logo || 'nba.svg'}`;
+            logo.alt = '';
+            logo.setAttribute('aria-hidden', 'true');
+            chip.appendChild(logo);
+
+            const rank = document.createElement('span');
+            rank.className = 'player-chip-rank';
+            rank.textContent = `#${index + 1}`;
+            chip.appendChild(rank);
+
+            const avatar = document.createElement('span');
+            avatar.className = 'player-chip-avatar';
+            avatar.textContent = initialsForName(row.player);
+            chip.appendChild(avatar);
+
+            const identity = document.createElement('span');
+            identity.className = 'player-chip-identity';
+
+            const name = document.createElement('span');
+            name.className = 'player-chip-name';
+            name.textContent = row.player;
+            identity.appendChild(name);
+
+            const team = document.createElement('span');
+            team.className = 'player-chip-team';
+            team.textContent = row.team || 'NBA';
+            identity.appendChild(team);
+
+            chip.appendChild(identity);
+
+            const stat = document.createElement('span');
+            stat.className = 'player-chip-stat';
+            stat.textContent = `${Number(row.last_10_points_avg).toFixed(1)} PPG`;
+            chip.appendChild(stat);
+
+            container.appendChild(chip);
+        });
+    }
+
+    document.querySelectorAll('.metric-toggle input').forEach((input) => {
+        input.addEventListener('change', updateCharts);
+    });
+
+    updateCharts();
+    renderRecentFormChart();
+    window.addEventListener('themechange', () => {
+        updateCharts();
+        renderRecentFormChart();
+    });
 </script>
 {% endblock %}

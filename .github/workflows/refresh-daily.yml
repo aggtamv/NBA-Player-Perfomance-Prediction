@@ -1,0 +1,67 @@
+name: Refresh daily games + deploy
+
+# Scrapes the latest NBA match (scores + boxscores) once a day, rebuilds the
+# static JSON, commits it, and redeploys GitHub Pages.
+#
+# NOTE: a commit made with the default GITHUB_TOKEN does NOT trigger other
+# workflows, so this job deploys Pages itself (rather than relying on deploy-pages.yml).
+
+on:
+  schedule:
+    - cron: "0 11 * * *"    # every day at 11:00 UTC (after the previous night's games are final)
+  workflow_dispatch: {}      # manual "Run workflow" button
+
+permissions:
+  contents: write            # push the refreshed JSON
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  refresh-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install scraper dependencies
+        run: pip install pandas numpy requests beautifulsoup4 lxml selenium
+
+      # ubuntu-latest ships google-chrome-stable; Selenium Manager auto-resolves the driver.
+      - name: Scrape latest games and re-export JSON
+        run: python static_page/refresh_daily.py
+
+      - name: Commit refreshed data (if changed)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add static_page/data data/daily_games || true
+          if git diff --cached --quiet; then
+            echo "No data changes to commit."
+          else
+            git commit -m "chore: refresh daily games data [skip ci]"
+            git push
+          fi
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload static_page artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: static_page
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

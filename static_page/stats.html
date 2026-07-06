@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stats - NBA Oracle</title>
+    <script>
+        const storedTheme = localStorage.getItem('nba-oracle-theme');
+        const preferredTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.dataset.theme = storedTheme || preferredTheme;
+        document.documentElement.dataset.bsTheme = storedTheme || preferredTheme;
+    </script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <link type="text/css" href="css/common.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-shell">
+        <div id="app-header"></div>
+        <main class="container-main-content">
+            <section class="page-shell stats-page">
+                <div class="dashboard-header">
+                    <div>
+                        <p class="eyebrow">Shooting trends</p>
+                        <h1 class="page-title">NBA shooting analytics</h1>
+                        <p class="page-subtitle">Track shot profile, finishing, and league-adjusted efficiency over time.</p>
+                    </div>
+                    <div class="dashboard-actions">
+                        <span class="game-status" id="year-range">No data</span>
+                    </div>
+                </div>
+
+                <div class="metric-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">Gold Players</div>
+                        <div class="metric-value" id="m-gold-players">-</div>
+                        <div class="metric-note">From recent-form dataset</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Top Recent Scorer</div>
+                        <div class="metric-value" id="m-gold-top">-</div>
+                        <div class="metric-note" id="m-gold-top-note">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Latest eFG%</div>
+                        <div class="metric-value" id="m-efg">-</div>
+                        <div class="metric-note" id="m-efg-note">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">3PAr Change</div>
+                        <div class="metric-value" id="m-3par">-</div>
+                        <div class="metric-note">Since first tracked season</div>
+                    </div>
+                </div>
+
+                <div class="stats-chart-grid">
+                    <section class="panel">
+                        <div class="panel-header">
+                            <div>
+                                <h2 class="panel-title">Raw Shooting Profile</h2>
+                                <p class="panel-subtitle">Shot distance mix and make rates</p>
+                            </div>
+                        </div>
+                        <div class="metric-selector" id="raw-metrics" aria-label="Raw shooting metrics"></div>
+                        <div class="chart-panel-body"><div id="rawShootingChart" class="plotly-chart"></div></div>
+                    </section>
+
+                    <section class="panel">
+                        <div class="panel-header">
+                            <div>
+                                <h2 class="panel-title">Adjusted Efficiency</h2>
+                                <p class="panel-subtitle">League-adjusted shooting and shot mix</p>
+                            </div>
+                        </div>
+                        <div class="metric-selector" id="adjusted-metrics" aria-label="Adjusted shooting metrics"></div>
+                        <div class="chart-panel-body"><div id="adjustedShootingChart" class="plotly-chart"></div></div>
+                    </section>
+                </div>
+
+                <section class="panel mt-3">
+                    <div class="panel-header">
+                        <div>
+                            <h2 class="panel-title">Player Recent Form</h2>
+                            <p class="panel-subtitle">Top players by prior 10-game production</p>
+                        </div>
+                        <span class="table-meta" id="rf-count">0 players shown</span>
+                    </div>
+                    <div class="chart-panel-body">
+                        <div id="recentFormChart" class="plotly-chart"></div>
+                        <div id="recentFormPlayers" class="player-chip-strip" aria-label="Recent form players"></div>
+                    </div>
+                    <div class="table-responsive stats-table-wrap stats-table-compact">
+                        <table class="table table-striped stats-table">
+                            <thead><tr id="rf-head"></tr></thead>
+                            <tbody id="rf-body"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section class="panel mt-3">
+                    <div class="panel-header">
+                        <div>
+                            <h2 class="panel-title">Season Tables</h2>
+                            <p class="panel-subtitle">Latest 10 seasons for quick inspection</p>
+                        </div>
+                    </div>
+                    <div class="stats-tabs">
+                        <ul class="nav nav-tabs px-3 pt-3" id="statsTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="raw-table-tab" data-bs-toggle="tab" data-bs-target="#raw-table-panel" type="button" role="tab">Raw Shooting</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="adjusted-table-tab" data-bs-toggle="tab" data-bs-target="#adjusted-table-panel" type="button" role="tab">Adjusted Shooting</button>
+                            </li>
+                        </ul>
+                        <div class="tab-content">
+                            <div class="tab-pane fade show active" id="raw-table-panel" role="tabpanel">
+                                <div class="table-responsive stats-table-wrap stats-table-compact">
+                                    <table class="table table-striped stats-table">
+                                        <thead><tr id="raw-tbl-head"></tr></thead>
+                                        <tbody id="raw-tbl-body"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="tab-pane fade" id="adjusted-table-panel" role="tabpanel">
+                                <div class="table-responsive stats-table-wrap stats-table-compact">
+                                    <table class="table table-striped stats-table">
+                                        <thead><tr id="adj-tbl-head"></tr></thead>
+                                        <tbody id="adj-tbl-body"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </section>
+        </main>
+    </div>
+    <script src="js/app.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <script src="js/stats.js"></script>
+</body>
+</html>

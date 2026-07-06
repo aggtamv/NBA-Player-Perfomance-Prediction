@@ -35,6 +35,10 @@ AVG_DATASETS = {
     "shooting/shooting_avg.csv": "shooting_avg",
 }
 
+GOLD_DATASETS = {
+    "player_recent_form/csv/data.csv": "player_recent_form",
+}
+
 
 def _normalize_column_name(name):
     name = str(name).strip().replace("\ufeff", "")
@@ -88,7 +92,10 @@ def _looks_like_multi_header(csv_path):
 
 def _read_csv(csv_path):
     header = [0, 1] if _looks_like_multi_header(csv_path) else 0
-    df = pd.read_csv(csv_path, encoding="utf-8-sig", low_memory=False, header=header)
+    try:
+        df = pd.read_csv(csv_path, encoding="utf-8-sig", low_memory=False, header=header)
+    except pd.errors.EmptyDataError:
+        return pd.DataFrame()
     df.columns = _flatten_columns(df.columns)
     return repair_dataframe_text(df)
 
@@ -237,6 +244,8 @@ def _dated_frames(csv_paths, date_prefix):
     frames = []
     for csv_path in sorted(csv_paths):
         df = _read_csv(csv_path)
+        if df.empty:
+            continue
         df.insert(0, "game_date", _extract_date_from_name(csv_path, date_prefix))
         df.insert(1, "source_file", csv_path.as_posix())
         frames.append(df)
@@ -263,6 +272,47 @@ def import_season_dataset(folder, force=False):
     return _import_table_if_changed(table_name, csv_paths, _season_frames)
 
 
+def import_daily_games_to_sqlite(force=False):
+    games_paths = sorted((DATA_ROOT / "daily_games").glob("games_*.csv"))
+    boxscore_paths = sorted((DATA_ROOT / "daily_games").glob("boxscores_*.csv"))
+
+    if force:
+        games_rows = _replace_table("daily_games", _dated_frames(games_paths, "games"), games_paths)
+        boxscore_rows = _replace_table(
+            "daily_team_boxscores",
+            _dated_frames(boxscore_paths, "boxscores"),
+            boxscore_paths,
+        )
+        return [
+            {"table": "daily_games", "rows": games_rows, "status": "imported"},
+            {"table": "daily_team_boxscores", "rows": boxscore_rows, "status": "imported"},
+        ]
+
+    return [
+        _import_table_if_changed("daily_games", games_paths, lambda paths: _dated_frames(paths, "games")),
+        _import_table_if_changed(
+            "daily_team_boxscores",
+            boxscore_paths,
+            lambda paths: _dated_frames(paths, "boxscores"),
+        ),
+    ]
+
+
+def import_gold_recent_form_to_sqlite(force=False):
+    table_name = GOLD_DATASETS["player_recent_form/csv/data.csv"]
+    csv_path = DATA_ROOT / "gold" / "player_recent_form" / "csv" / "data.csv"
+    builder = lambda paths: [_read_csv(paths[0])]
+
+    if not csv_path.exists():
+        return {"table": table_name, "rows": 0, "status": "missing"}
+
+    if force:
+        rows = _replace_table(table_name, builder([csv_path]), [csv_path])
+        return {"table": table_name, "rows": rows, "status": "imported"}
+
+    return _import_table_if_changed(table_name, [csv_path], builder)
+
+
 def import_all_data_to_sqlite(force=False):
     results = []
 
@@ -278,10 +328,8 @@ def import_all_data_to_sqlite(force=False):
         else:
             results.append(_import_table_if_changed(table_name, [csv_path], builder))
 
-    games_paths = sorted((DATA_ROOT / "daily_games").glob("games_*.csv"))
-    boxscore_paths = sorted((DATA_ROOT / "daily_games").glob("boxscores_*.csv"))
-    results.append(_import_table_if_changed("daily_games", games_paths, lambda paths: _dated_frames(paths, "games")))
-    results.append(_import_table_if_changed("daily_team_boxscores", boxscore_paths, lambda paths: _dated_frames(paths, "boxscores")))
+    results.extend(import_daily_games_to_sqlite(force=force))
+    results.append(import_gold_recent_form_to_sqlite(force=force))
 
     game_team_paths = sorted((DATA_ROOT / "boxscores").glob("*/*_team_boxscore.csv"))
     game_player_paths = sorted((DATA_ROOT / "boxscores").glob("*/*_player_boxscore.csv"))

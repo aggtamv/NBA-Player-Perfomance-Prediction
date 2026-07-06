@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Predictions - NBA Oracle</title>
+    <script>
+        const storedTheme = localStorage.getItem('nba-oracle-theme');
+        const preferredTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.dataset.theme = storedTheme || preferredTheme;
+        document.documentElement.dataset.bsTheme = storedTheme || preferredTheme;
+    </script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <link type="text/css" href="css/common.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-shell">
+        <div id="app-header"></div>
+        <main class="container-main-content">
+            <section class="page-shell">
+                <div class="dashboard-header">
+                    <div>
+                        <p class="eyebrow">Model workspace</p>
+                        <h1 class="page-title">Player prediction</h1>
+                        <p class="page-subtitle">Select a player or upload custom stats, then review the model output.</p>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <section class="panel form-card">
+                        <div class="panel-header">
+                            <div>
+                                <h2 class="panel-title">Input</h2>
+                                <p class="panel-subtitle">Choose one source for the prediction</p>
+                            </div>
+                        </div>
+                        <div class="panel-body">
+                            <form id="predict-form">
+                                <ul class="nav nav-tabs mb-3" id="predictionTabs" role="tablist">
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link active" id="player-tab" data-bs-toggle="tab" data-bs-target="#player-panel" type="button" role="tab" aria-selected="true">Player</button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload-panel" type="button" role="tab" aria-selected="false">CSV Upload</button>
+                                    </li>
+                                </ul>
+
+                                <div class="tab-content mb-3">
+                                    <div class="tab-pane fade show active" id="player-panel" role="tabpanel">
+                                        <label for="player_name" class="form-label">NBA player</label>
+                                        <div class="autocomplete">
+                                            <input type="text" class="form-control" id="player_name" autocomplete="off" placeholder="Type at least 2 letters">
+                                            <div id="playerSuggestions" class="autocomplete-menu" role="listbox" aria-label="Player suggestions"></div>
+                                        </div>
+                                        <div class="form-text">Start typing a player name, then select a suggestion.</div>
+                                    </div>
+                                    <div class="tab-pane fade" id="upload-panel" role="tabpanel">
+                                        <label for="csv_file" class="form-label">Upload CSV</label>
+                                        <input type="file" class="form-control" id="csv_file" accept=".csv">
+                                        <div class="form-text">CSV with 10 rows &times; 20 feature columns. <a href="sample/input_sample.csv" download>Download sample</a>.</div>
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary w-100" id="predict-btn">Predict</button>
+                            </form>
+                        </div>
+                    </section>
+
+                    <aside class="panel">
+                        <div class="panel-header">
+                            <div>
+                                <h2 class="panel-title">Result</h2>
+                                <p class="panel-subtitle">Prediction output appears here</p>
+                            </div>
+                        </div>
+                        <div class="panel-body">
+                            <div id="result-area">
+                                <div class="table-meta">No prediction has been generated yet.</div>
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+
+                <section class="panel mt-3" id="player-stats-panel" style="display:none;">
+                    <div class="panel-header">
+                        <div>
+                            <h2 class="panel-title">Last 10 Games</h2>
+                            <p class="panel-subtitle" id="player-stats-name"></p>
+                        </div>
+                    </div>
+                    <div class="table-responsive stats-table-wrap">
+                        <table class="table table-striped stats-table">
+                            <thead><tr id="ps-head"></tr></thead>
+                            <tbody id="ps-body"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </section>
+        </main>
+    </div>
+    <script src="js/app.js"></script>
+    <script type="module" src="js/prediction.js"></script>
+</body>
+</html>

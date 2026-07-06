@@ -1,0 +1,64 @@
+name: Refresh season stats + deploy
+
+# Scrapes yearly player totals + league shooting averages on a slow cadence
+# (season data barely changes), rebuilds the static JSON, commits it, and
+# redeploys GitHub Pages. Both scrapes use plain requests (no browser needed).
+
+on:
+  schedule:
+    - cron: "0 12 1 * *"     # 12:00 UTC on the 1st of every month
+  workflow_dispatch: {}       # manual "Run workflow" button (use this for a one-off yearly refresh)
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  refresh-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install scraper dependencies
+        run: pip install pandas numpy requests beautifulsoup4 lxml
+
+      - name: Scrape season stats and re-export JSON
+        run: python static_page/refresh_season.py
+
+      - name: Commit refreshed data (if changed)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add static_page/data data/totals data/shooting data/adj_shooting || true
+          if git diff --cached --quiet; then
+            echo "No data changes to commit."
+          else
+            git commit -m "chore: refresh season stats data [skip ci]"
+            git push
+          fi
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload static_page artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: static_page
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

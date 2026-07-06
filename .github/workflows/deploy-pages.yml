@@ -1,0 +1,47 @@
+name: Deploy static site to GitHub Pages
+
+# Publishes the static_page/ folder to GitHub Pages.
+# The site is fully static: it loads pre-exported JSON (static_page/data/*.json)
+# and calls the Hugging Face model directly from the browser.
+#
+# One-time setup: repo Settings -> Pages -> "Build and deployment" -> Source: "GitHub Actions".
+
+on:
+  push:
+    branches: [main, main_flask]
+    paths:
+      - "static_page/**"
+      - ".github/workflows/deploy-pages.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment; don't cancel an in-progress run.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload static_page artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: static_page
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

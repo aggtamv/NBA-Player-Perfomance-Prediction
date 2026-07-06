@@ -49,7 +49,7 @@
                     <h2 class="panel-title">Daily Games</h2>
                     <p class="panel-subtitle">Scores and quarter splits</p>
                 </div>
-                {% if data_fetch_required %}
+                {% if refresh_daily_games_required %}
                     <span class="game-status">Updating</span>
                 {% endif %}
             </div>
@@ -189,6 +189,7 @@
 {% block script_block %}
 <script>
     const dataFetchRequired = {{ data_fetch_required | tojson }};
+    const refreshDailyGamesRequired = {{ refresh_daily_games_required | tojson }};
 
     async function refreshDailyGames() {
         const loading = document.getElementById("daily-games-loading");
@@ -201,7 +202,9 @@
                 throw new Error(result.message || "Failed to fetch NBA data.");
             }
 
-            window.location.reload();
+            if (dataFetchRequired || result.changed) {
+                window.location.reload();
+            }
         } catch (error) {
             if (loading) {
                 loading.className = "alert alert-danger status-empty";
@@ -210,13 +213,32 @@
         }
     }
 
-    if (dataFetchRequired) {
+    if (dataFetchRequired || refreshDailyGamesRequired) {
         refreshDailyGames();
     }
 
     const searchBox = document.getElementById("searchBox");
     const statsTable = document.getElementById("statsTable");
     const visibleRows = document.getElementById("visibleRows");
+
+    // Size the Player Totals scroll area so it always fits within the current
+    // viewport (only the table scrolls internally; the page itself doesn't).
+    const statsWrap = statsTable ? statsTable.closest(".stats-table-wrap") : null;
+
+    function fitStatsTableToViewport() {
+        if (!statsWrap) {
+            return;
+        }
+        const bottomGap = 24; // px of breathing room below the table
+        const top = statsWrap.getBoundingClientRect().top;
+        const available = window.innerHeight - top - bottomGap;
+        statsWrap.style.maxHeight = Math.max(available, 200) + "px";
+    }
+
+    if (statsWrap) {
+        fitStatsTableToViewport();
+        window.addEventListener("resize", fitStatsTableToViewport);
+    }
 
     if (searchBox && statsTable) {
         const tableBody = statsTable.getElementsByTagName("tbody")[0];
